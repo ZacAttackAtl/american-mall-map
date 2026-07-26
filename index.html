@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>American Mall Map</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+
+<style>
+  body { margin: 0; padding: 0; }
+  #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+  .popup-card {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+  }
+  .popup-card h3 {
+      margin: 0 0 5px 0;
+  }
+  #search-container {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 300px;
+      z-index: 1000;
+  }
+
+  #search {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      box-sizing: border-box;
+  }
+
+  #results {
+      background: white;
+      max-height: 250px;
+      overflow-y: auto;
+      border-radius: 4px;
+  }
+
+  .result {
+      padding: 8px;
+      cursor: pointer;
+  }
+
+  .result:hover {
+      background: #eeeeee;
+  }
+
+</style>
+</head>
+<body>
+
+<div id="search-container">
+    <input
+        id="search"
+        type="text"
+        placeholder="Search malls..."
+        autocomplete="off">
+
+    <div id="results"></div>
+</div>
+
+<div id="map"></div>
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiemFjYXR0YWNrYXRsIiwiYSI6ImNta2Z2YnFlNDAxZDgzZXEyZm12dm5hZGEifQ.fq135KRa2HGUnKQLypT-Iw';
+
+const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/zacattackatl/cmkfvhufo002d01qq9wm99ga8',
+    center: [-98.7, 37.84],
+    zoom: 3
+});
+let malls = [];
+
+fetch("malls.json")
+    .then(response => response.json())
+    .then(data => {
+        malls = data;
+        console.log("Loaded", malls.length, "malls");
+    })
+    .catch(error => {
+        console.error("Couldn't load malls.json:", error);
+    });
+map.on('load', () => {
+
+    const layerId = 'Mega_List'; // ⚠️ CHANGE if needed
+
+    if (!map.getLayer(layerId)) {
+        console.error("Layer not found:", layerId);
+        return;
+    }
+map.addLayer({
+    id: 'mall-labels',
+    type: 'symbol',
+    source: 'Mega_List',
+    'source-layer': 'Mega_List', // or whatever your actual source-layer name is
+    layout: {
+        'text-field': ['get', 'Name'],
+        'text-size': 8,
+        'text-offset': [0, 1.2],
+        'text-anchor': 'top',
+        'text-allow-overlap': false
+    },
+    paint: {
+        'text-color': '#222222',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1
+    }
+});
+    map.on('click', layerId, (e) => {
+
+        if (!e.features.length) return;
+
+        const feature = e.features[0];
+        const coordinates = feature.geometry.coordinates.slice();
+        const props = feature.properties;
+
+        // Fix for zoomed out world wrap
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+            coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+        }
+
+        new mapboxgl.Popup({ closeOnClick: true })
+            .setLngLat(coordinates)
+            .setHTML(`
+                <div class="popup-card">
+                    <h3>${props["Name"] || "Unknown Mall"}</h3>
+                    <strong>Location:</strong> ${props["City"] || ""}, ${props["State"] || ""}<br>
+                    <strong>Open?</strong> ${props["Open?"] || "N/A"}<br>
+                    <strong>Type:</strong> ${props["Type"] || "N/A"}<br>
+                    <strong>Opened:</strong> ${props["Date of Opening"] || "N/A"}<br>
+                    <strong>Closed:</strong> ${props["Date of Closing"] || "N/A"}<br>
+                    <strong>Previous Names:</strong> ${props["Previous Names"] || "None"}<br>
+                    <strong>Notes:</strong> ${props["Notes"] || "None"}<br>
+                    <hr>
+<small>
+Coordinates:
+${coordinates[1].toFixed(6)}, ${coordinates[0].toFixed(6)}
+</small>
+                </div>
+            `)
+            .addTo(map);
+    });
+
+    map.on('mouseenter', layerId, () => {
+        map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', layerId, () => {
+        map.getCanvas().style.cursor = '';
+    });
+
+});
+</script>
+
+</body>
+</html>
