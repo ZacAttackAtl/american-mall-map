@@ -154,17 +154,43 @@ searchInput.addEventListener("input", () => {
                 essential: true
             });
 
-            new mapboxgl.Popup({ closeOnClick: true })
-                .setLngLat([longitude, latitude])
-                .setHTML(`
-                    <div class="popup-card">
-                        <h3>${escapeHtml(mall.Name || "Unknown Mall")}</h3>
-                        <strong>Location:</strong>
-                        ${escapeHtml(mall.City || "")},
-                        ${escapeHtml(mall.State || "")}
-                    </div>
-                `)
-                .addTo(map);
+new mapboxgl.Popup({ closeOnClick: true })
+    .setLngLat([longitude, latitude])
+    .setHTML(`
+        <div class="popup-card">
+            <h3>${escapeHtml(mall["Name"] || "Unknown Mall")}</h3>
+
+            <strong>Location:</strong>
+            ${escapeHtml(mall["City"] || "")},
+            ${escapeHtml(mall["State"] || "")}<br>
+
+            <strong>Open?</strong>
+            ${escapeHtml(mall["Open?"] || "N/A")}<br>
+
+            <strong>Type:</strong>
+            ${escapeHtml(mall["Type"] || "N/A")}<br>
+
+            <strong>Opened:</strong>
+            ${escapeHtml(mall["Date of Opening"] || "N/A")}<br>
+
+            <strong>Closed:</strong>
+            ${escapeHtml(mall["Date of Closing"] || "N/A")}<br>
+
+            <strong>Previous Names:</strong>
+            ${escapeHtml(mall["Previous Names"] || "None")}<br>
+
+            <strong>Notes:</strong>
+            ${escapeHtml(mall["Notes"] || "None")}<br>
+
+            <hr>
+
+            <small>
+                Coordinates:
+                ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
+            </small>
+        </div>
+    `)
+    .addTo(map);
 
             searchInput.value = mall.Name || "";
             resultsContainer.innerHTML = "";
