@@ -77,15 +77,117 @@ const map = new mapboxgl.Map({
 });
 let malls = [];
 
+const searchInput = document.getElementById("search");
+const resultsContainer = document.getElementById("results");
+
 fetch("malls.json")
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
+        }
+
+        return response.json();
+    })
     .then(data => {
         malls = data;
         console.log("Loaded", malls.length, "malls");
     })
     .catch(error => {
         console.error("Couldn't load malls.json:", error);
+        resultsContainer.innerHTML =
+            '<div class="result">Mall search could not be loaded.</div>';
     });
+
+searchInput.addEventListener("input", () => {
+    const query = searchInput.value.trim().toLowerCase();
+
+    resultsContainer.innerHTML = "";
+
+    if (query.length < 2) {
+        return;
+    }
+
+    const matches = malls
+        .filter(mall => {
+            const name = String(mall.Name || "").toLowerCase();
+            const city = String(mall.City || "").toLowerCase();
+            const state = String(mall.State || "").toLowerCase();
+
+            return (
+                name.includes(query) ||
+                city.includes(query) ||
+                state.includes(query)
+            );
+        })
+        .slice(0, 12);
+
+    if (matches.length === 0) {
+        resultsContainer.innerHTML =
+            '<div class="result">No matching malls found.</div>';
+        return;
+    }
+
+    matches.forEach(mall => {
+        const result = document.createElement("div");
+        result.className = "result";
+
+        result.innerHTML = `
+            <strong>${escapeHtml(mall.Name || "Unknown Mall")}</strong><br>
+            <small>
+                ${escapeHtml(mall.City || "")},
+                ${escapeHtml(mall.State || "")}
+            </small>
+        `;
+
+        result.addEventListener("click", () => {
+            const longitude = Number(mall.lng);
+            const latitude = Number(mall.lat);
+
+            if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+                console.error("Invalid coordinates:", mall);
+                return;
+            }
+
+            map.flyTo({
+                center: [longitude, latitude],
+                zoom: 14,
+                essential: true
+            });
+
+            new mapboxgl.Popup({ closeOnClick: true })
+                .setLngLat([longitude, latitude])
+                .setHTML(`
+                    <div class="popup-card">
+                        <h3>${escapeHtml(mall.Name || "Unknown Mall")}</h3>
+                        <strong>Location:</strong>
+                        ${escapeHtml(mall.City || "")},
+                        ${escapeHtml(mall.State || "")}
+                    </div>
+                `)
+                .addTo(map);
+
+            searchInput.value = mall.Name || "";
+            resultsContainer.innerHTML = "";
+        });
+
+        resultsContainer.appendChild(result);
+    });
+});
+
+document.addEventListener("click", event => {
+    if (!document.getElementById("search-container").contains(event.target)) {
+        resultsContainer.innerHTML = "";
+    }
+});
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
 map.on('load', () => {
 
     const layerId = 'Mega_List'; // ⚠️ CHANGE if needed
