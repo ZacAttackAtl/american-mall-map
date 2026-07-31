@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <title>American Mall Map</title>
@@ -9,59 +9,111 @@
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
 
 <style>
-  body { margin: 0; padding: 0; }
-  #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+
   .popup-card {
-      font-family: Arial, sans-serif;
-      font-size: 14px;
-      line-height: 1.4;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    max-width: 320px;
   }
+
   .popup-card h3 {
-      margin: 0 0 5px 0;
+    margin: 0 0 5px;
   }
+
+  .popup-card hr {
+    border: 0;
+    border-top: 1px solid #ddd;
+    margin: 8px 0;
+  }
+
   #search-container {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      width: 300px;
-      z-index: 1000;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: min(300px, calc(100vw - 70px));
+    z-index: 1000;
+    font-family: Arial, sans-serif;
   }
 
   #search {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      box-sizing: border-box;
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    box-sizing: border-box;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+    background: white;
   }
 
   #results {
-      background: white;
-      max-height: 250px;
-      overflow-y: auto;
-      border-radius: 4px;
+    display: none;
+    background: white;
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid #bbb;
+    border-top: 0;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   }
 
   .result {
-      padding: 8px;
-      cursor: pointer;
+    padding: 8px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
   }
 
-  .result:hover {
-      background: #eeeeee;
+  .result:last-child {
+    border-bottom: 0;
   }
 
+  .result:hover,
+  .result.active {
+    background: #eeeeee;
+  }
+
+  .result-name {
+    font-weight: 700;
+  }
+
+  .result-location {
+    color: #555;
+    font-size: 13px;
+  }
+
+  #status {
+    display: none;
+    margin-top: 5px;
+    padding: 7px 9px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 4px;
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
 
 <div id="search-container">
-    <input
-        id="search"
-        type="text"
-        placeholder="Search malls..."
-        autocomplete="off">
-
-    <div id="results"></div>
+  <input
+    id="search"
+    type="search"
+    placeholder="Search malls..."
+    autocomplete="off"
+    aria-label="Search malls"
+  />
+  <div id="results" role="listbox"></div>
+  <div id="status" aria-live="polite"></div>
 </div>
 
 <div id="map"></div>
@@ -70,219 +122,383 @@
 mapboxgl.accessToken = 'pk.eyJ1IjoiemFjYXR0YWNrYXRsIiwiYSI6ImNta2Z2YnFlNDAxZDgzZXEyZm12dm5hZGEifQ.fq135KRa2HGUnKQLypT-Iw';
 
 const map = new mapboxgl.Map({
-    container: 'map',
-    style: 'mapbox://styles/zacattackatl/cmkfvhufo002d01qq9wm99ga8',
-    center: [-98.7, 37.84],
-    zoom: 3
+  container: 'map',
+  style: 'mapbox://styles/zacattackatl/cmkfvhufo002d01qq9wm99ga8',
+  center: [-98.7, 37.84],
+  zoom: 3
 });
+
+map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+const searchInput = document.getElementById('search');
+const resultsBox = document.getElementById('results');
+const statusBox = document.getElementById('status');
+
 let malls = [];
+let activeResultIndex = -1;
+let visibleResults = [];
 
-const searchInput = document.getElementById("search");
-const resultsContainer = document.getElementById("results");
-
-fetch("malls.json")
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
-        }
-
-        return response.json();
-    })
-    .then(data => {
-        malls = data;
-        console.log("Loaded", malls.length, "malls");
-    })
-    .catch(error => {
-        console.error("Couldn't load malls.json:", error);
-        resultsContainer.innerHTML =
-            '<div class="result">Mall search could not be loaded.</div>';
-    });
-
-searchInput.addEventListener("input", () => {
-    const query = searchInput.value.trim().toLowerCase();
-
-    resultsContainer.innerHTML = "";
-
-    if (query.length < 2) {
-        return;
-    }
-
-    const matches = malls
-        .filter(mall => {
-            const name = String(mall.Name || "").toLowerCase();
-            const city = String(mall.City || "").toLowerCase();
-            const state = String(mall.State || "").toLowerCase();
-
-            return (
-                name.includes(query) ||
-                city.includes(query) ||
-                state.includes(query)
-            );
-        })
-        .slice(0, 12);
-
-    if (matches.length === 0) {
-        resultsContainer.innerHTML =
-            '<div class="result">No matching malls found.</div>';
-        return;
-    }
-
-    matches.forEach(mall => {
-        const result = document.createElement("div");
-        result.className = "result";
-
-        result.innerHTML = `
-            <strong>${escapeHtml(mall.Name || "Unknown Mall")}</strong><br>
-            <small>
-                ${escapeHtml(mall.City || "")},
-                ${escapeHtml(mall.State || "")}
-            </small>
-        `;
-
-        result.addEventListener("click", () => {
-            const longitude = Number(mall.lng);
-            const latitude = Number(mall.lat);
-
-            if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
-                console.error("Invalid coordinates:", mall);
-                return;
-            }
-
-            map.flyTo({
-                center: [longitude, latitude],
-                zoom: 14,
-                essential: true
-            });
-
-new mapboxgl.Popup({ closeOnClick: true })
-    .setLngLat([longitude, latitude])
-    .setHTML(`
-        <div class="popup-card">
-            <h3>${escapeHtml(mall["Name"] || "Unknown Mall")}</h3>
-
-            <strong>Location:</strong>
-            ${escapeHtml(mall["City"] || "")},
-            ${escapeHtml(mall["State"] || "")}<br>
-
-            <strong>Open?</strong>
-            ${escapeHtml(mall["Open?"] || "N/A")}<br>
-
-            <strong>Type:</strong>
-            ${escapeHtml(mall["Type"] || "N/A")}<br>
-
-            <strong>Opened:</strong>
-            ${escapeHtml(mall["Date of Opening"] || "N/A")}<br>
-
-            <strong>Closed:</strong>
-            ${escapeHtml(mall["Date of Closing"] || "N/A")}<br>
-
-            <strong>Previous Names:</strong>
-            ${escapeHtml(mall["Previous Names"] || "None")}<br>
-
-            <strong>Notes:</strong>
-            ${escapeHtml(mall["Notes"] || "None")}<br>
-
-            <hr>
-
-            <small>
-                Coordinates:
-                ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
-            </small>
-        </div>
-    `)
-    .addTo(map);
-
-            searchInput.value = mall.Name || "";
-            resultsContainer.innerHTML = "";
-        });
-
-        resultsContainer.appendChild(result);
-    });
-});
-
-document.addEventListener("click", event => {
-    if (!document.getElementById("search-container").contains(event.target)) {
-        resultsContainer.innerHTML = "";
-    }
-});
+function text(value, fallback = '') {
+  if (value === null || value === undefined) return fallback;
+  const cleaned = String(value).trim();
+  return cleaned && cleaned !== '-' ? cleaned : fallback;
+}
 
 function escapeHtml(value) {
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 }
-map.on('load', () => {
 
-    const layerId = 'Mega_List'; // ⚠️ CHANGE if needed
+function popupHtml(feature) {
+  const props = feature.properties || {};
+  const coordinates = feature.geometry.coordinates;
 
-    if (!map.getLayer(layerId)) {
-        console.error("Layer not found:", layerId);
-        return;
+  return `
+    <div class="popup-card">
+      <h3>${escapeHtml(text(props['Name'], 'Unknown Mall'))}</h3>
+      <strong>Location:</strong> ${escapeHtml(text(props['City']))}, ${escapeHtml(text(props['State']))}<br>
+      <strong>Open?</strong> ${escapeHtml(text(props['Open?'], 'N/A'))}<br>
+      <strong>Type:</strong> ${escapeHtml(text(props['Type'], 'N/A'))}<br>
+      <strong>Opened:</strong> ${escapeHtml(text(props['Date of Opening'], 'N/A'))}<br>
+      <strong>Closed:</strong> ${escapeHtml(text(props['Date of Closing'], 'N/A'))}<br>
+      <strong>Previous Names:</strong> ${escapeHtml(text(props['Previous Names'], 'None'))}<br>
+      <strong>Notes:</strong> ${escapeHtml(text(props['Notes'], 'None'))}<br>
+      <hr>
+      <small>Coordinates: ${coordinates[1].toFixed(6)}, ${coordinates[0].toFixed(6)}</small>
+    </div>
+  `;
+}
+
+function openMall(feature, zoom = 13) {
+  const coordinates = feature.geometry.coordinates.slice();
+
+  map.flyTo({
+    center: coordinates,
+    zoom,
+    essential: true
+  });
+
+  new mapboxgl.Popup({ closeOnClick: true })
+    .setLngLat(coordinates)
+    .setHTML(popupHtml(feature))
+    .addTo(map);
+}
+
+function clearResults() {
+  resultsBox.innerHTML = '';
+  resultsBox.style.display = 'none';
+  visibleResults = [];
+  activeResultIndex = -1;
+}
+
+function renderResults(matches) {
+  resultsBox.innerHTML = '';
+  visibleResults = matches;
+  activeResultIndex = -1;
+
+  if (!matches.length) {
+    const empty = document.createElement('div');
+    empty.className = 'result';
+    empty.textContent = 'No malls found';
+    resultsBox.appendChild(empty);
+    resultsBox.style.display = 'block';
+    return;
+  }
+
+  matches.forEach((feature, index) => {
+    const props = feature.properties || {};
+    const item = document.createElement('div');
+    item.className = 'result';
+    item.setAttribute('role', 'option');
+    item.dataset.index = index;
+
+    const name = document.createElement('div');
+    name.className = 'result-name';
+    name.textContent = text(props['Name'], 'Unknown Mall');
+
+    const location = document.createElement('div');
+    location.className = 'result-location';
+    location.textContent = [text(props['City']), text(props['State'])]
+      .filter(Boolean)
+      .join(', ');
+
+    item.append(name, location);
+    item.addEventListener('click', () => {
+      openMall(feature);
+      clearResults();
+      searchInput.value = text(props['Name'], '');
+    });
+
+    resultsBox.appendChild(item);
+  });
+
+  resultsBox.style.display = 'block';
+}
+
+function updateActiveResult() {
+  const items = resultsBox.querySelectorAll('.result[role="option"]');
+  items.forEach((item, index) => {
+    item.classList.toggle('active', index === activeResultIndex);
+  });
+
+  if (activeResultIndex >= 0 && items[activeResultIndex]) {
+    items[activeResultIndex].scrollIntoView({ block: 'nearest' });
+  }
+}
+
+searchInput.addEventListener('input', () => {
+  const query = searchInput.value.trim().toLowerCase();
+
+  if (query.length < 2) {
+    clearResults();
+    return;
+  }
+
+  const matches = malls
+    .filter(feature => {
+      const props = feature.properties || {};
+      const haystack = [
+        props['Name'],
+        props['City'],
+        props['State'],
+        props['Previous Names']
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(query);
+    })
+    .sort((a, b) => {
+      const aName = text(a.properties?.['Name']).toLowerCase();
+      const bName = text(b.properties?.['Name']).toLowerCase();
+      const aStarts = aName.startsWith(query) ? 0 : 1;
+      const bStarts = bName.startsWith(query) ? 0 : 1;
+      return aStarts - bStarts || aName.localeCompare(bName);
+    })
+    .slice(0, 50);
+
+  renderResults(matches);
+});
+
+searchInput.addEventListener('keydown', event => {
+  if (!visibleResults.length) return;
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    activeResultIndex = Math.min(activeResultIndex + 1, visibleResults.length - 1);
+    updateActiveResult();
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    activeResultIndex = Math.max(activeResultIndex - 1, 0);
+    updateActiveResult();
+  } else if (event.key === 'Enter' && activeResultIndex >= 0) {
+    event.preventDefault();
+    const feature = visibleResults[activeResultIndex];
+    openMall(feature);
+    searchInput.value = text(feature.properties?.['Name'], '');
+    clearResults();
+  } else if (event.key === 'Escape') {
+    clearResults();
+  }
+});
+
+document.addEventListener('click', event => {
+  if (!document.getElementById('search-container').contains(event.target)) {
+    clearResults();
+  }
+});
+
+map.on('load', async () => {
+  statusBox.style.display = 'block';
+  statusBox.textContent = 'Loading mall data...';
+
+  try {
+    const response = await fetch('malls.json', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
-map.addLayer({
-    id: 'mall-labels',
-    type: 'symbol',
-    source: 'Mega_List',
-    'source-layer': 'Mega_List', // or whatever your actual source-layer name is
-    layout: {
+
+    const geojson = await response.json();
+
+    if (geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
+      throw new Error('malls.json is not a GeoJSON FeatureCollection');
+    }
+
+    malls = geojson.features.filter(feature =>
+      feature?.geometry?.type === 'Point' &&
+      Array.isArray(feature.geometry.coordinates) &&
+      feature.geometry.coordinates.length >= 2
+    );
+
+    // Remove any old layers from the former Mapbox-hosted Mega_List tileset.
+    // This prevents duplicate dots if the custom basemap style still contains them.
+    const oldLayers = (map.getStyle().layers || [])
+      .filter(layer => layer.id === 'Mega_List' || layer.source === 'Mega_List')
+      .map(layer => layer.id);
+
+    oldLayers.reverse().forEach(layerId => {
+      if (map.getLayer(layerId)) map.removeLayer(layerId);
+    });
+
+    if (map.getSource('Mega_List')) {
+      map.removeSource('Mega_List');
+    }
+
+    map.addSource('malls', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: malls
+      }
+    });
+
+    // Closed malls are drawn first so open malls remain visually prominent.
+    map.addLayer({
+      id: 'closed-mall-dots',
+      type: 'circle',
+      source: 'malls',
+      filter: ['!=', ['downcase', ['to-string', ['coalesce', ['get', 'Open?'], '']]], 'yes'],
+      paint: {
+        'circle-radius': [
+          'interpolate', ['linear'], ['zoom'],
+          3, 2.5,
+          7, 4,
+          12, 6,
+          16, 8
+        ],
+        'circle-color': '#111111',
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': [
+          'interpolate', ['linear'], ['zoom'],
+          3, 0.4,
+          10, 1
+        ],
+        'circle-opacity': 0.88
+      }
+    });
+
+    map.addLayer({
+      id: 'open-mall-dots',
+      type: 'circle',
+      source: 'malls',
+      filter: ['==', ['downcase', ['to-string', ['coalesce', ['get', 'Open?'], '']]], 'yes'],
+      paint: {
+        'circle-radius': [
+          'interpolate', ['linear'], ['zoom'],
+          3, 3,
+          7, 4.5,
+          12, 6.5,
+          16, 8.5
+        ],
+        'circle-color': '#7b2cbf',
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': [
+          'interpolate', ['linear'], ['zoom'],
+          3, 0.5,
+          10, 1.2
+        ],
+        'circle-opacity': 0.95
+      }
+    });
+
+    // Closed labels load first and later, allowing open labels to take priority.
+    map.addLayer({
+      id: 'closed-mall-labels',
+      type: 'symbol',
+      source: 'malls',
+      minzoom: 7.5,
+      filter: ['!=', ['downcase', ['to-string', ['coalesce', ['get', 'Open?'], '']]], 'yes'],
+      layout: {
         'text-field': ['get', 'Name'],
-        'text-size': 8,
-        'text-offset': [0, 1.2],
+        'text-size': [
+          'interpolate', ['linear'], ['zoom'],
+          7.5, 8,
+          11, 10,
+          15, 13
+        ],
+        'text-offset': [0, 1.15],
         'text-anchor': 'top',
-        'text-allow-overlap': false
-    },
-    paint: {
+        'text-allow-overlap': false,
+        'text-ignore-placement': false,
+        'text-optional': true
+      },
+      paint: {
         'text-color': '#222222',
         'text-halo-color': '#ffffff',
-        'text-halo-width': 1
-    }
-});
-    map.on('click', layerId, (e) => {
+        'text-halo-width': 1.2
+      }
+    });
 
-        if (!e.features.length) return;
+    map.addLayer({
+      id: 'open-mall-labels',
+      type: 'symbol',
+      source: 'malls',
+      minzoom: 6.5,
+      filter: ['==', ['downcase', ['to-string', ['coalesce', ['get', 'Open?'], '']]], 'yes'],
+      layout: {
+        'text-field': ['get', 'Name'],
+        'text-size': [
+          'interpolate', ['linear'], ['zoom'],
+          6.5, 9,
+          11, 11,
+          15, 14
+        ],
+        'text-offset': [0, 1.2],
+        'text-anchor': 'top',
+        'text-allow-overlap': false,
+        'text-ignore-placement': false,
+        'text-optional': true,
+        'symbol-sort-key': 0
+      },
+      paint: {
+        'text-color': '#5a189a',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.4
+      }
+    });
 
-        const feature = e.features[0];
+    const clickableLayers = ['open-mall-dots', 'closed-mall-dots'];
+
+    clickableLayers.forEach(layerId => {
+      map.on('click', layerId, event => {
+        if (!event.features?.length) return;
+
+        const feature = event.features[0];
         const coordinates = feature.geometry.coordinates.slice();
-        const props = feature.properties;
 
-        // Fix for zoomed out world wrap
-        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-            coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+        while (Math.abs(event.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += event.lngLat.lng > coordinates[0] ? 360 : -360;
         }
 
         new mapboxgl.Popup({ closeOnClick: true })
-            .setLngLat(coordinates)
-            .setHTML(`
-                <div class="popup-card">
-                    <h3>${props["Name"] || "Unknown Mall"}</h3>
-                    <strong>Location:</strong> ${props["City"] || ""}, ${props["State"] || ""}<br>
-                    <strong>Open?</strong> ${props["Open?"] || "N/A"}<br>
-                    <strong>Type:</strong> ${props["Type"] || "N/A"}<br>
-                    <strong>Opened:</strong> ${props["Date of Opening"] || "N/A"}<br>
-                    <strong>Closed:</strong> ${props["Date of Closing"] || "N/A"}<br>
-                    <strong>Previous Names:</strong> ${props["Previous Names"] || "None"}<br>
-                    <strong>Notes:</strong> ${props["Notes"] || "None"}<br>
-                    <hr>
-<small>
-Coordinates:
-${coordinates[1].toFixed(6)}, ${coordinates[0].toFixed(6)}
-</small>
-                </div>
-            `)
-            .addTo(map);
-    });
+          .setLngLat(coordinates)
+          .setHTML(popupHtml(feature))
+          .addTo(map);
+      });
 
-    map.on('mouseenter', layerId, () => {
+      map.on('mouseenter', layerId, () => {
         map.getCanvas().style.cursor = 'pointer';
-    });
+      });
 
-    map.on('mouseleave', layerId, () => {
+      map.on('mouseleave', layerId, () => {
         map.getCanvas().style.cursor = '';
+      });
     });
 
+    statusBox.textContent = `Loaded ${malls.length.toLocaleString()} malls`;
+    setTimeout(() => {
+      statusBox.style.display = 'none';
+    }, 1800);
+  } catch (error) {
+    console.error('Could not load malls.json:', error);
+    statusBox.style.display = 'block';
+    statusBox.textContent = `Could not load mall data: ${error.message}`;
+  }
 });
 </script>
 
