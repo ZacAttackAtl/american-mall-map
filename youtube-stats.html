@@ -75,42 +75,65 @@
 
   </div>
 
-  <script>
-    const API_KEY = "AIzaSyDOgyisBnK1W1nJVe9xPl6GefcJuCng2CU";
-    const CHANNEL_ID = "UC7YEmpVvPAJm-NswOTuUZ-Q";
+<script>
+  const API_KEY = "AIzaSyDOgyisBnK1W1nJVe9xPl6GefcJuCng2CU";
+  const UPLOADS_PLAYLIST_ID = "UU7YEmpVvPAJm-NswOTuUZ-Q";
 
-    const url =
-      `https://www.googleapis.com/youtube/v3/channels` +
-      `?part=statistics&id=${CHANNEL_ID}&key=${API_KEY}`;
+  const url =
+    `https://www.googleapis.com/youtube/v3/playlistItems` +
+    `?part=snippet` +
+    `&playlistId=${UPLOADS_PLAYLIST_ID}` +
+    `&maxResults=1` +
+    `&key=${API_KEY}`;
 
-    fetch(url)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error("YouTube API request failed");
-        }
-        return response.json();
-      })
-      .then(data => {
+  fetch(url)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("YouTube API request failed");
+      }
 
-        const stats = data.items[0].statistics;
+      return response.json();
+    })
 
-        const subscribers = Number(stats.subscriberCount);
-        const videos = Number(stats.videoCount);
+    .then(data => {
 
-        document.getElementById("subscribers").textContent =
-          subscribers.toLocaleString();
+      if (!data.items || data.items.length === 0) {
+        throw new Error("No videos found");
+      }
 
-        document.getElementById("videos").textContent =
-          videos.toLocaleString();
+      const latest = data.items[0];
 
-      })
-      .catch(error => {
-        console.error("Could not load YouTube statistics:", error);
+      const videoId = latest.snippet.resourceId.videoId;
+      const title = latest.snippet.title;
+      const published = new Date(latest.snippet.publishedAt);
 
-        document.getElementById("subscribers").textContent = "2K+";
-        document.getElementById("videos").textContent = "75+";
-      });
-  </script>
+      document.getElementById("video").src =
+        `https://www.youtube.com/embed/${videoId}`;
+
+      document.getElementById("title").textContent = title;
+
+      document.getElementById("date").textContent =
+        "Published " +
+        published.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric"
+        });
+
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("video-content").style.display = "block";
+
+    })
+
+    .catch(error => {
+
+      console.error(error);
+
+      document.getElementById("loading").textContent =
+        "Unable to load latest video.";
+
+    });
+</script>
 
 </body>
 </html>
