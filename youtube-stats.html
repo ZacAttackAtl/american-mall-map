@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: monospace;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 70px;
+      padding: 25px 20px;
+      text-align: center;
+    }
+
+    .stat-number {
+      font-size: 34px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      letter-spacing: 2px;
+      opacity: 0.75;
+    }
+
+    @media (max-width: 600px) {
+      .stats {
+        gap: 30px;
+      }
+
+      .stat-number {
+        font-size: 26px;
+      }
+
+      .stat-label {
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="stats">
+
+    <div>
+      <div class="stat-number" id="subscribers">---</div>
+      <div class="stat-label">SUBSCRIBERS</div>
+    </div>
+
+    <div>
+      <div class="stat-number">350+</div>
+      <div class="stat-label">MALLS VISITED</div>
+    </div>
+
+    <div>
+      <div class="stat-number" id="videos">---</div>
+      <div class="stat-label">VIDEOS</div>
+    </div>
+
+  </div>
+
+  <script>
+    const API_KEY = "AIzaSyDOgyisBnK1W1nJVe9xPl6GefcJuCng2CU";
+    const CHANNEL_ID = "UC7YEmpVvPAJm-NswOTuUZ-Q";
+
+    const url =
+      `https://www.googleapis.com/youtube/v3/channels` +
+      `?part=statistics&id=${CHANNEL_ID}&key=${API_KEY}`;
+
+    fetch(url)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("YouTube API request failed");
+        }
+        return response.json();
+      })
+      .then(data => {
+
+        const stats = data.items[0].statistics;
+
+        const subscribers = Number(stats.subscriberCount);
+        const videos = Number(stats.videoCount);
+
+        document.getElementById("subscribers").textContent =
+          subscribers.toLocaleString();
+
+        document.getElementById("videos").textContent =
+          videos.toLocaleString();
+
+      })
+      .catch(error => {
+        console.error("Could not load YouTube statistics:", error);
+
+        document.getElementById("subscribers").textContent = "2K+";
+        document.getElementById("videos").textContent = "75+";
+      });
+  </script>
+
+</body>
+</html>
